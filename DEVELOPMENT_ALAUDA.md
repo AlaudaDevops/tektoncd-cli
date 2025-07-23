@@ -1,64 +1,64 @@
-# Tkn alauda 分支开发指南
+# Tkn alauda Branch Development Guide
 
-## 背景
+## Background
 
-此前，tkn 作为通用的 cli，在多个插件中都有被使用，需要各自修复 tkn 自身的漏洞。
+Previously, `tkn` was used as a general-purpose CLI across multiple plugins, each needing to fix vulnerabilities in `tkn` independently.
 
-为了避免重复工作，所以我们基于 [tkn](https://github.com/tektoncd/cli.git) fork 出了当前仓库，并通过 `alauda-vx.xx.xx` 分支来维护。
+To avoid duplicated effort, we forked the current repository from [tkn](https://github.com/tektoncd/cli.git) and maintain it through branches named `alauda-vx.xx.xx`.
 
-使用 [renovate](https://gitlab-ce.alauda.cn/devops/tech-research/renovate/-/blob/main/docs/quick-start/0002-quick-start.md) 自动修复对应版本上的漏洞。
+We use [renovate](https://gitlab-ce.alauda.cn/devops/tech-research/renovate/-/blob/main/docs/quick-start/0002-quick-start.md) to automatically fix vulnerabilities in corresponding versions.
 
-## 仓库结构
+## Repository Structure
 
-在原有代码的基础上，添加了以下内容：
+Based on the original code, the following content has been added:
 
-- [alauda-auto-tag.yaml](./.github/workflows/alauda-auto-tag.yaml): PR 合并到 `alauda-vx.xx.xx` 分支时，自动打 tag，并触发 goreleaser
-- [release-alauda.yaml](./.github/workflows/release-alauda.yaml): 支持 tag 更新或手动触发 goreleaser（action 里自动创建 tag 时不会触发该流水线，因为 action 的设计是不会递归触发多个 action）
-- [reusable-release-alauda.yaml](./.github/workflows/reusable-release-alauda.yaml): 执行 goreleaser 创建 release
-- [scan-alauda.yaml](.github/workflows/scan-alauda.yaml): 执行 trivy 扫描漏洞（`rootfs` 扫描 go binary）
-- [.goreleaser-alauda.yml](.goreleaser-alauda.yml): 发布 alauda 版本的 release 的配置文件
+- [alauda-auto-tag.yaml](./.github/workflows/alauda-auto-tag.yaml): Automatically tags and triggers goreleaser when a PR is merged into the `alauda-vx.xx.xx` branch
+- [release-alauda.yaml](./.github/workflows/release-alauda.yaml): Supports triggering goreleaser manually or upon tag updates (this pipeline won't be triggered if a tag is created automatically within an action, as actions are designed not to recursively trigger multiple actions)
+- [reusable-release-alauda.yaml](./.github/workflows/reusable-release-alauda.yaml): Executes goreleaser to create a release
+- [scan-alauda.yaml](.github/workflows/scan-alauda.yaml): Runs trivy to scan for vulnerabilities (`rootfs` scans Go binaries)
+- [.goreleaser-alauda.yml](.goreleaser-alauda.yml): Configuration file for releasing alauda versions
 
-## 特殊改动
+## Special Modifications
 
-1. 官方没有提供自动化测试的 Github Action，所以自行写了个 [test-alauda.yaml](.github/workflows/test-alauda.yaml)，执行 `make test`
+1. The official project does not provide GitHub Actions for automated testing, so we wrote our own [test-alauda.yaml](.github/workflows/test-alauda.yaml) that runs `make test`
 
-## 流水线
+## Pipelines
 
-### 提 PR 时触发
+### Triggered When Pull Request is Submitted
 
-- [test-alauda.yaml](.github/workflows/test-alauda.yaml): 执行官方的测试 `make test`
+- [test-alauda.yaml](.github/workflows/test-alauda.yaml): Executes the official tests using `make test`
 
-### 合并到 alauda-vx.xx.xx 分支时触发
+### Triggered When Merged into alauda-vx.xx.xx Branch
 
-- [alauda-auto-tag.yaml](.github/workflows/alauda-auto-tag.yaml): 自动打 tag，并触发 goreleaser
-- [reusable-release-alauda.yaml](.github/workflows/reusable-release-alauda.yaml): 执行 goreleaser 创建 release（由 `alauda-auto-tag.yaml` 触发）
+- [alauda-auto-tag.yaml](.github/workflows/alauda-auto-tag.yaml): Automatically tags and triggers goreleaser
+- [reusable-release-alauda.yaml](.github/workflows/reusable-release-alauda.yaml): Executes goreleaser to create a release (triggered by `alauda-auto-tag.yaml`)
 
-### 定时或手动触发
+### Scheduled or Manually Triggered
 
-- [scan-alauda.yaml](.github/workflows/scan-alauda.yaml): 执行 trivy 扫描漏洞（`rootfs` 扫描 go binary）
+- [scan-alauda.yaml](.github/workflows/scan-alauda.yaml): Runs trivy to scan for vulnerabilities (`rootfs` scans Go binaries)
 
-### 其他
+### Others
 
-其他官方维护的流水线没有做改动，在 Action 页面上禁用了一些无关的流水线。
+Other pipelines maintained officially have not been modified; some irrelevant pipelines have been disabled on the Actions page.
 
-## renovate 漏洞修复机制
+## Renovate Vulnerability Fixing Mechanism
 
-renovate 的配置文件是 [renovate.json](https://github.com/AlaudaDevops/trivy/blob/main/renovate.json)
+The renovate configuration file is [renovate.json](https://github.com/AlaudaDevops/trivy/blob/main/renovate.json)
 
-1. renovate 检测到分支存在漏洞，提 PR 修复
-2. PR 自动执行测试
-3. 所有测试通过后，renovate 自动合并 PR
-4. 分支更新后，通过 action 自动打 tag（例：v0.62.1-alauda-0，patch 版本和最后一位都会递增）
-5. goreleaser 基于 tag 自动发布 release
+1. renovate detects vulnerabilities in the branch and creates a PR to fix them
+2. Tests are automatically executed on the PR
+3. After all tests pass, renovate automatically merges the PR
+4. After the branch is updated, an action automatically tags the commit (e.g., v0.62.1-alauda-0, where both the patch version and the last digit increment)
+5. goreleaser automatically publishes a release based on the tag
 
-## 维护方案
+## Maintenance Plan
 
-当需要升级新版本时，按照以下步骤执行：
+When upgrading to a new version, follow these steps:
 
-1. 从对应 tag 拉出 alauda 分支，例如 `v0.62.1` tag 对应 `alauda-v0.62.1` 分支
-2. 将此前的 alauda 分支改动 cherry-pick 到新分支，并 push
+1. Create an alauda branch from the corresponding tag, e.g., the `v0.62.1` tag corresponds to the `alauda-v0.62.1` branch
+2. Cherry-pick previous alauda branch changes to the new branch and push
 
-renovate 自动修复机制：
-1. renovate 提 PR 后，会自动跑流水线，若所有测试通过，则 PR 将会被自动合并
-2. 合并到 `alauda-v0.62.1` 分支后，goreleaser 会自动创建出 `v0.62.2-alauda-0` release（注意：不是 `v0.62.1-alauda-0`，因为升级版本才能让 renovate 识别到）
-3. 其他插件中配置的 renovate 会根据配置自动从 release 中获取制品
+Renovate automatic fixing mechanism:
+1. After renovate creates a PR, pipelines run automatically; if all tests pass, the PR will be merged automatically
+2. After merging into the `alauda-v0.62.1` branch, goreleaser will automatically create a `v0.62.2-alauda-0` release (note: not `v0.62.1-alauda-0`, because only a newer version allows renovate to detect it)
+3. renovate configured in other plugins will automatically fetch artifacts from the release according to its configuration
