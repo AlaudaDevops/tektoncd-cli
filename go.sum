@@ -951,6 +951,8 @@ github.com/docker/distribution v2.8.3+incompatible h1:AtKxIZ36LoNK51+Z6RpzLpddBi
 github.com/docker/distribution v2.8.3+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
 github.com/docker/docker v24.0.7+incompatible h1:Wo6l37AuwP3JaMnZa226lzVXGA3F9Ig1seQen0cKYlM=
 github.com/docker/docker v24.0.7+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v25.0.6+incompatible h1:5cPwbwriIcsua2REJe8HqQV+6WlWc1byg2QSXzBxBGg=
+github.com/docker/docker v25.0.6+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker-credential-helpers v0.8.0 h1:YQFtbBQb4VrpoPxhFuzEBPQ9E16qz5SpHLS+uswaCp8=
 github.com/docker/docker-credential-helpers v0.8.0/go.mod h1:UGFXcuoQ5TxPiB54nHOZ32AWRqQdECoh/Mg0AlEYb40=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
@@ -1871,6 +1873,7 @@ github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d h1:vfofYNRScrDd
 github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d/go.mod h1:RRCYJbIwD5jmqPI9XoAFR0OcDxqUctll6zUj/+B4S48=
 github.com/tektoncd/chains v0.19.0 h1:kS5MP9RhKmbpwtdWG7c1r3IDBKpu5x4Tq+Z7zhgyWmQ=
 github.com/tektoncd/chains v0.19.0/go.mod h1:w7XdpEKDgBnUtLBhQsgwYcuyjKawqxih9VZuT7VtIOY=
+github.com/tektoncd/chains v0.25.1/go.mod h1:G7mAYYxgmS0lVkHyy2hEOLQCFB0DlQFTMLWggykrydY=
 github.com/tektoncd/hub v1.15.1 h1:Guk2OJqtkd9c6oyFtGFEtzxd115hRE4nsJJQYSCI3i8=
 github.com/tektoncd/hub v1.15.1/go.mod h1:QrqfcSb37jMLhrRaLr8mER7hEjgLqEJV43Iy37Jrpes=
 github.com/tektoncd/pipeline v0.55.0 h1:RUfqSC/J1dMrdfu1ThJreHojwGXcWc8P131el/c+c1c=
