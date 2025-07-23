@@ -1,6 +1,6 @@
 module github.com/tektoncd/cli
 
-go 1.23.0
+go 1.23.11
 
 toolchain go1.24.5
 
