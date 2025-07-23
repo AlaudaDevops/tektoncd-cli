@@ -74,6 +74,7 @@ type poolConfig struct {
 	MaxConnecting    uint64
 	MaxIdleTime      time.Duration
 	MaintainInterval time.Duration
+	LoadBalanced     bool
 	PoolMonitor      *event.PoolMonitor
 	Logger           *logger.Logger
 	handshakeErrFn   func(error, uint64, *primitive.ObjectID)
@@ -93,6 +94,7 @@ type pool struct {
 	minSize       uint64
 	maxSize       uint64
 	maxConnecting uint64
+	loadBalanced  bool
 	monitor       *event.PoolMonitor
 	logger        *logger.Logger
 
@@ -206,6 +208,7 @@ func newPool(config poolConfig, connOpts ...ConnectionOption) *pool {
 		minSize:               config.MinPoolSize,
 		maxSize:               config.MaxPoolSize,
 		maxConnecting:         maxConnecting,
+		loadBalanced:          config.LoadBalanced,
 		monitor:               config.PoolMonitor,
 		logger:                config.Logger,
 		handshakeErrFn:        config.handshakeErrFn,
@@ -372,6 +375,13 @@ func (p *pool) close(ctx context.Context) {
 	// Empty the idle connections stack and try to deliver ErrPoolClosed to any waiting wantConns
 	// from idleConnWait while holding the idleMu lock.
 	p.idleMu.Lock()
+	for _, conn := range p.idleConns {
+		_ = p.removeConnection(conn, reason{
+			loggerConn: logger.ReasonConnClosedPoolClosed,
+			event:      event.ReasonPoolClosed,
+		}, nil)
+		_ = p.closeConnection(conn) // We don't care about errors while closing the connection.
+	}
 	p.idleConns = p.idleConns[:0]
 	for {
 		w := p.idleConnWait.popFront()
@@ -399,16 +409,6 @@ func (p *pool) close(ctx context.Context) {
 	}
 	p.createConnectionsCond.L.Unlock()
 
-	// Now that we're not holding any locks, remove all of the connections we collected from the
-	// pool.
-	for _, conn := range conns {
-		_ = p.removeConnection(conn, reason{
-			loggerConn: logger.ReasonConnClosedPoolClosed,
-			event:      event.ReasonPoolClosed,
-		}, nil)
-		_ = p.closeConnection(conn) // We don't care about errors while closing the connection.
-	}
-
 	if mustLogPoolMessage(p) {
 		logPoolMessage(p, logger.ConnectionPoolClosed)
 	}
@@ -418,6 +418,16 @@ func (p *pool) close(ctx context.Context) {
 			Type:    event.PoolClosedEvent,
 			Address: p.address.String(),
 		})
+	}
+
+	// Now that we're not holding any locks, remove all of the connections we collected from the
+	// pool.
+	for _, conn := range conns {
+		_ = p.removeConnection(conn, reason{
+			loggerConn: logger.ReasonConnClosedPoolClosed,
+			event:      event.ReasonPoolClosed,
+		}, nil)
+		_ = p.closeConnection(conn) // We don't care about errors while closing the connection.
 	}
 }
 
@@ -500,6 +510,7 @@ func (p *pool) checkOut(ctx context.Context) (conn *connection, err error) {
 				Type:    event.GetFailed,
 				Address: p.address.String(),
 				Reason:  event.ReasonConnectionErrored,
+				Error:   err,
 			})
 		}
 		return nil, err
@@ -542,6 +553,7 @@ func (p *pool) checkOut(ctx context.Context) (conn *connection, err error) {
 					Type:    event.GetFailed,
 					Address: p.address.String(),
 					Reason:  event.ReasonConnectionErrored,
+					Error:   w.err,
 				})
 			}
 			return nil, w.err
@@ -572,6 +584,7 @@ func (p *pool) checkOut(ctx context.Context) (conn *connection, err error) {
 	p.stateMu.RUnlock()
 
 	// Wait for either the wantConn to be ready or for the Context to time out.
+	start := time.Now()
 	select {
 	case <-w.ready:
 		if w.err != nil {
@@ -589,6 +602,7 @@ func (p *pool) checkOut(ctx context.Context) (conn *connection, err error) {
 					Type:    event.GetFailed,
 					Address: p.address.String(),
 					Reason:  event.ReasonConnectionErrored,
+					Error:   w.err,
 				})
 			}
 
@@ -612,6 +626,8 @@ func (p *pool) checkOut(ctx context.Context) (conn *connection, err error) {
 		}
 		return w.conn, nil
 	case <-ctx.Done():
+		duration := time.Since(start)
+
 		if mustLogPoolMessage(p) {
 			keysAndValues := logger.KeyValues{
 				logger.KeyReason, logger.ReasonConnCheckoutFailedTimout,
@@ -625,16 +641,24 @@ func (p *pool) checkOut(ctx context.Context) (conn *connection, err error) {
 				Type:    event.GetFailed,
 				Address: p.address.String(),
 				Reason:  event.ReasonTimedOut,
+				Error:   ctx.Err(),
 			})
 		}
 
-		return nil, WaitQueueTimeoutError{
-			Wrapped:                      ctx.Err(),
-			PinnedCursorConnections:      atomic.LoadUint64(&p.pinnedCursorConnections),
-			PinnedTransactionConnections: atomic.LoadUint64(&p.pinnedTransactionConnections),
-			maxPoolSize:                  p.maxSize,
-			totalConnectionCount:         p.totalConnectionCount(),
+		err := WaitQueueTimeoutError{
+			Wrapped:              ctx.Err(),
+			maxPoolSize:          p.maxSize,
+			totalConnections:     p.totalConnectionCount(),
+			availableConnections: p.availableConnectionCount(),
+			waitDuration:         duration,
 		}
+		if p.loadBalanced {
+			err.pinnedConnections = &pinnedConnections{
+				cursorConnections:      atomic.LoadUint64(&p.pinnedCursorConnections),
+				transactionConnections: atomic.LoadUint64(&p.pinnedTransactionConnections),
+			}
+		}
+		return nil, err
 	}
 }
 
@@ -765,20 +789,16 @@ func (p *pool) checkInNoEvent(conn *connection) error {
 	// connection should never be perished due to max idle time.
 	conn.bumpIdleDeadline()
 
-	if reason, perished := connectionPerished(conn); perished {
-		_ = p.removeConnection(conn, reason, nil)
-		go func() {
-			_ = p.closeConnection(conn)
-		}()
-		return nil
-	}
-
-	if conn.pool.getState() == poolClosed {
-		_ = p.removeConnection(conn, reason{
+	r, perished := connectionPerished(conn)
+	if !perished && conn.pool.getState() == poolClosed {
+		perished = true
+		r = reason{
 			loggerConn: logger.ReasonConnClosedPoolClosed,
 			event:      event.ReasonPoolClosed,
-		}, nil)
-
+		}
+	}
+	if perished {
+		_ = p.removeConnection(conn, r, nil)
 		go func() {
 			_ = p.closeConnection(conn)
 		}()
@@ -808,12 +828,37 @@ func (p *pool) checkInNoEvent(conn *connection) error {
 	return nil
 }
 
+// clear calls clearImpl internally with a false interruptAllConnections value.
+func (p *pool) clear(err error, serviceID *primitive.ObjectID) {
+	p.clearImpl(err, serviceID, false)
+}
+
+// clearAll does same as the "clear" method but interrupts all connections.
+func (p *pool) clearAll(err error, serviceID *primitive.ObjectID) {
+	p.clearImpl(err, serviceID, true)
+}
+
+// interruptConnections interrupts the input connections.
+func (p *pool) interruptConnections(conns []*connection) {
+	for _, conn := range conns {
+		_ = p.removeConnection(conn, reason{
+			loggerConn: logger.ReasonConnClosedStale,
+			event:      event.ReasonStale,
+		}, nil)
+		go func(c *connection) {
+			_ = p.closeConnection(c)
+		}(conn)
+	}
+}
+
 // clear marks all connections as stale by incrementing the generation number, stops all background
 // goroutines, removes all requests from idleConnWait and newConnWait, and sets the pool state to
 // "paused". If serviceID is nil, clear marks all connections as stale. If serviceID is not nil,
 // clear marks only connections associated with the given serviceID stale (for use in load balancer
 // mode).
-func (p *pool) clear(err error, serviceID *primitive.ObjectID) {
+// If interruptAllConnections is true, this function calls interruptConnections to interrupt all
+// non-idle connections.
+func (p *pool) clearImpl(err error, serviceID *primitive.ObjectID, interruptAllConnections bool) {
 	if p.getState() == poolClosed {
 		return
 	}
@@ -837,7 +882,51 @@ func (p *pool) clear(err error, serviceID *primitive.ObjectID) {
 		}
 		p.lastClearErr = err
 		p.stateMu.Unlock()
+	}
 
+	if mustLogPoolMessage(p) {
+		keysAndValues := logger.KeyValues{
+			logger.KeyServiceID, serviceID,
+		}
+
+		logPoolMessage(p, logger.ConnectionPoolCleared, keysAndValues...)
+	}
+
+	if sendEvent && p.monitor != nil {
+		event := &event.PoolEvent{
+			Type:         event.PoolCleared,
+			Address:      p.address.String(),
+			ServiceID:    serviceID,
+			Interruption: interruptAllConnections,
+			Error:        err,
+		}
+		p.monitor.Event(event)
+	}
+
+	p.removePerishedConns()
+	if interruptAllConnections {
+		p.createConnectionsCond.L.Lock()
+		p.idleMu.Lock()
+
+		idleConns := make(map[*connection]bool, len(p.idleConns))
+		for _, idle := range p.idleConns {
+			idleConns[idle] = true
+		}
+
+		conns := make([]*connection, 0, len(p.conns))
+		for _, conn := range p.conns {
+			if _, ok := idleConns[conn]; !ok && p.stale(conn) {
+				conns = append(conns, conn)
+			}
+		}
+
+		p.idleMu.Unlock()
+		p.createConnectionsCond.L.Unlock()
+
+		p.interruptConnections(conns)
+	}
+
+	if serviceID == nil {
 		pcErr := poolClearedError{err: err, address: p.address}
 
 		// Clear the idle connections wait queue.
@@ -863,22 +952,6 @@ func (p *pool) clear(err error, serviceID *primitive.ObjectID) {
 			w.tryDeliver(nil, pcErr)
 		}
 		p.createConnectionsCond.L.Unlock()
-	}
-
-	if mustLogPoolMessage(p) {
-		keysAndValues := logger.KeyValues{
-			logger.KeyServiceID, serviceID,
-		}
-
-		logPoolMessage(p, logger.ConnectionPoolCleared, keysAndValues...)
-	}
-
-	if sendEvent && p.monitor != nil {
-		p.monitor.Event(&event.PoolEvent{
-			Type:      event.PoolCleared,
-			Address:   p.address.String(),
-			ServiceID: serviceID,
-		})
 	}
 }
 
