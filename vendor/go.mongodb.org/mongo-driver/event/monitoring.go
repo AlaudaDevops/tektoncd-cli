@@ -43,6 +43,7 @@ type CommandFinishedEvent struct {
 	DurationNanos int64
 	Duration      time.Duration
 	CommandName   string
+	DatabaseName  string
 	RequestID     int64
 	ConnectionID  string
 	// ServerConnectionID contains the connection ID from the server of the operation. If the server does not return
@@ -119,8 +120,9 @@ type PoolEvent struct {
 	Reason       string              `json:"reason"`
 	// ServiceID is only set if the Type is PoolCleared and the server is deployed behind a load balancer. This field
 	// can be used to distinguish between individual servers in a load balanced deployment.
-	ServiceID *primitive.ObjectID `json:"serviceId"`
-	Error     error               `json:"error"`
+	ServiceID    *primitive.ObjectID `json:"serviceId"`
+	Interruption bool                `json:"interruptInUseConnections"`
+	Error        error               `json:"error"`
 }
 
 // PoolMonitor is a function that allows the user to gain access to events occurring in the pool
