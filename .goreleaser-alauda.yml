@@ -27,7 +27,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -w -s -X knative.dev/pkg/changeset.rev={{.Version}}
+      - -w -s -X github.com/tektoncd/cli/pkg/cmd/version.clientVersion={{.Version}}
     main: ./cmd/tkn
     binary: alauda-tkn
 
@@ -57,6 +57,6 @@ release:
 
     ---
 
-    This release is intended for use only as part of the Alauda product suite. 
-    It is not recommended for use by individuals or teams outside of Alauda. 
+    This release is intended for use only as part of the Alauda product suite.
+    It is not recommended for use by individuals or teams outside of Alauda.
     Any consequences arising from its use are the sole responsibility of the user.
