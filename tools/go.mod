@@ -1,6 +1,6 @@
 module github.com/tektoncd/cli/tools
 
-go 1.25.1
+go 1.25.2
 
 require github.com/golangci/golangci-lint v1.55.2
 
