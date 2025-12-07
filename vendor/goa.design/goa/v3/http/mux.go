@@ -6,13 +6,14 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sync"
 
 	chi "github.com/go-chi/chi/v5"
 )
 
 type (
 	// Muxer is the HTTP request multiplexer interface used by the generated
-	// code. ServerHTTP must match the HTTP method and URL of each incoming
+	// code. ServeHTTP must match the HTTP method and URL of each incoming
 	// request against the list of registered patterns and call the handler
 	// for the corresponding method and the pattern that most closely
 	// matches the URL.
@@ -70,6 +71,10 @@ type (
 	// mux is the default Muxer implementation.
 	mux struct {
 		chi.Router
+		// protect access to middlewares and handlers
+		mu sync.Mutex
+		// middlewares to be registered before handlers
+		middlewares []func(http.Handler) http.Handler
 		// wildcards maps a method and a pattern to the name of the wildcard
 		// this is needed because chi does not expose the name of the wildcard
 		wildcards map[string]string
@@ -78,14 +83,11 @@ type (
 
 // NewMuxer returns a Muxer implementation based on a Chi router.
 func NewMuxer() ResolverMuxer {
-	r := chi.NewRouter()
-	r.NotFound(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx := context.WithValue(req.Context(), AcceptTypeKey, req.Header.Get("Accept"))
-		enc := ResponseEncoder(ctx, w)
-		w.WriteHeader(http.StatusNotFound)
-		enc.Encode(NewErrorResponse(ctx, fmt.Errorf("404 page not found"))) // nolint:errcheck
-	}))
-	return &mux{Router: r, wildcards: make(map[string]string)}
+	return &mux{
+		Router:      chi.NewRouter(),
+		wildcards:   make(map[string]string),
+		middlewares: nil,
+	}
 }
 
 // wildPath matches a wildcard path segment.
@@ -93,6 +95,20 @@ var wildPath = regexp.MustCompile(`/{\*([a-zA-Z0-9_]+)}`)
 
 // Handle registers the handler function for the given method and pattern.
 func (m *mux) Handle(method, pattern string, handler http.HandlerFunc) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.middlewares != nil {
+		for _, middleware := range m.middlewares {
+			m.Router.Use(middleware)
+		}
+		m.NotFound(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ctx := context.WithValue(req.Context(), AcceptTypeKey, req.Header.Get("Accept"))
+			enc := ResponseEncoder(ctx, w)
+			w.WriteHeader(http.StatusNotFound)
+			enc.Encode(NewErrorResponse(ctx, fmt.Errorf("404 page not found"))) // nolint:errcheck
+		}))
+		m.middlewares = nil
+	}
 	if wildcards := wildPath.FindStringSubmatch(pattern); len(wildcards) > 0 {
 		if len(wildcards) > 2 {
 			panic("too many wildcards")
@@ -136,6 +152,12 @@ func unescape(s string) string {
 // Use appends a middleware to the list of middlewares to be applied
 // downstream the Muxer.
 func (m *mux) Use(f func(http.Handler) http.Handler) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.middlewares != nil {
+		m.middlewares = append(m.middlewares, f)
+		return
+	}
 	m.Router.Use(f)
 }
 
@@ -168,7 +190,7 @@ func (m *mux) ensureContext(r *http.Request) *chi.Context {
 	if ctx.RoutePattern() != "" {
 		return ctx // already initialized
 	}
-	if !m.Router.Match(ctx, r.Method, r.URL.Path) {
+	if !m.Match(ctx, r.Method, r.URL.Path) {
 		return nil // route not handled by chi
 	}
 	return ctx

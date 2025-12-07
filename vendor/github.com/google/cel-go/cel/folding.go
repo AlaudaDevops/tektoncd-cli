@@ -68,13 +68,18 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 	// Walk the list of foldable expression and continue to fold until there are no more folds left.
 	// All of the fold candidates returned by the constantExprMatcher should succeed unless there's
 	// a logic bug with the selection of expressions.
-	foldableExprs := ast.MatchDescendants(root, constantExprMatcher)
+	constantExprMatcherCapture := func(e ast.NavigableExpr) bool { return constantExprMatcher(ctx, a, e) }
+	foldableExprs := ast.MatchDescendants(root, constantExprMatcherCapture)
 	foldCount := 0
 	for len(foldableExprs) != 0 && foldCount < opt.maxFoldIterations {
 		for _, fold := range foldableExprs {
 			// If the expression could be folded because it's a non-strict call, and the
 			// branches are pruned, continue to the next fold.
 			if fold.Kind() == ast.CallKind && maybePruneBranches(ctx, fold) {
+				continue
+			}
+			// Late-bound function calls cannot be folded.
+			if fold.Kind() == ast.CallKind && isLateBoundFunctionCall(ctx, a, fold) {
 				continue
 			}
 			// Otherwise, assume all context is needed to evaluate the expression.
@@ -85,7 +90,7 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 			}
 		}
 		foldCount++
-		foldableExprs = ast.MatchDescendants(root, constantExprMatcher)
+		foldableExprs = ast.MatchDescendants(root, constantExprMatcherCapture)
 	}
 	// Once all of the constants have been folded, try to run through the remaining comprehensions
 	// one last time. In this case, there's no guarantee they'll run, so we only update the
@@ -111,7 +116,7 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 			ctx.ReportErrorAtID(root.ID(), "constant-folding evaluation failed: %v", err.Error())
 			return
 		}
-		e.SetKindCase(adapted)
+		ctx.UpdateExpr(e, adapted)
 	}))
 
 	return a
@@ -134,11 +139,18 @@ func tryFold(ctx *OptimizerContext, a *ast.AST, expr ast.Expr) error {
 	if err != nil {
 		return err
 	}
-	// Clear any macro metadata associated with the fold.
-	a.SourceInfo().ClearMacroCall(expr.ID())
 	// Update the fold expression to be a literal.
-	expr.SetKindCase(ctx.NewLiteral(out))
+	ctx.UpdateExpr(expr, ctx.NewLiteral(out))
 	return nil
+}
+
+func isLateBoundFunctionCall(ctx *OptimizerContext, a *ast.AST, expr ast.Expr) bool {
+	call := expr.AsCall()
+	function := ctx.Functions()[call.FunctionName()]
+	if function == nil {
+		return false
+	}
+	return function.HasLateBinding()
 }
 
 // maybePruneBranches inspects the non-strict call expression to determine whether
@@ -159,15 +171,15 @@ func maybePruneBranches(ctx *OptimizerContext, expr ast.NavigableExpr) bool {
 			return false
 		}
 		if cond.AsLiteral() == types.True {
-			expr.SetKindCase(truthy)
+			ctx.UpdateExpr(expr, truthy)
 		} else {
-			expr.SetKindCase(falsy)
+			ctx.UpdateExpr(expr, falsy)
 		}
 		return true
 	case operators.In:
 		haystack := args[1]
 		if haystack.Kind() == ast.ListKind && haystack.AsList().Size() == 0 {
-			expr.SetKindCase(ctx.NewLiteral(types.False))
+			ctx.UpdateExpr(expr, ctx.NewLiteral(types.False))
 			return true
 		}
 		needle := args[0]
@@ -176,7 +188,7 @@ func maybePruneBranches(ctx *OptimizerContext, expr ast.NavigableExpr) bool {
 			list := haystack.AsList()
 			for _, e := range list.Elements() {
 				if e.Kind() == ast.LiteralKind && e.AsLiteral().Equal(needleValue) == types.True {
-					expr.SetKindCase(ctx.NewLiteral(types.True))
+					ctx.UpdateExpr(expr, ctx.NewLiteral(types.True))
 					return true
 				}
 			}
@@ -202,20 +214,20 @@ func maybeShortcircuitLogic(ctx *OptimizerContext, function string, args []ast.E
 			continue
 		}
 		if arg.AsLiteral() == shortcircuit {
-			expr.SetKindCase(arg)
+			ctx.UpdateExpr(expr, arg)
 			return true
 		}
 	}
 	if len(newArgs) == 0 {
 		newArgs = append(newArgs, args[0])
-		expr.SetKindCase(newArgs[0])
+		ctx.UpdateExpr(expr, newArgs[0])
 		return true
 	}
 	if len(newArgs) == 1 {
-		expr.SetKindCase(newArgs[0])
+		ctx.UpdateExpr(expr, newArgs[0])
 		return true
 	}
-	expr.SetKindCase(ctx.NewCall(function, newArgs...))
+	ctx.UpdateExpr(expr, ctx.NewCall(function, newArgs...))
 	return true
 }
 
@@ -270,10 +282,10 @@ func pruneOptionalListElements(ctx *OptimizerContext, e ast.Expr) {
 			newOptIndex-- // Skipping causes the list to get smaller.
 			continue
 		}
-		e.SetKindCase(ctx.NewLiteral(optElemVal.GetValue()))
+		ctx.UpdateExpr(e, ctx.NewLiteral(optElemVal.GetValue()))
 		updatedElems = append(updatedElems, e)
 	}
-	e.SetKindCase(ctx.NewList(updatedElems, updatedIndices))
+	ctx.UpdateExpr(e, ctx.NewList(updatedElems, updatedIndices))
 }
 
 func pruneOptionalMapEntries(ctx *OptimizerContext, e ast.Expr) {
@@ -303,7 +315,7 @@ func pruneOptionalMapEntries(ctx *OptimizerContext, e ast.Expr) {
 			if err != nil {
 				ctx.ReportErrorAtID(val.ID(), "invalid map value literal %v: %v", optElemVal, err)
 			}
-			val.SetKindCase(undoOptVal)
+			ctx.UpdateExpr(val, undoOptVal)
 			updatedEntries = append(updatedEntries, e)
 			continue
 		}
@@ -311,12 +323,12 @@ func pruneOptionalMapEntries(ctx *OptimizerContext, e ast.Expr) {
 		if !optElemVal.HasValue() {
 			continue
 		}
-		val.SetKindCase(ctx.NewLiteral(optElemVal.GetValue()))
+		ctx.UpdateExpr(val, ctx.NewLiteral(optElemVal.GetValue()))
 		updatedEntry := ctx.NewMapEntry(key, val, false)
 		updatedEntries = append(updatedEntries, updatedEntry)
 	}
 	if modified {
-		e.SetKindCase(ctx.NewMap(updatedEntries))
+		ctx.UpdateExpr(e, ctx.NewMap(updatedEntries))
 	}
 }
 
@@ -341,12 +353,12 @@ func pruneOptionalStructFields(ctx *OptimizerContext, e ast.Expr) {
 		if !optElemVal.HasValue() {
 			continue
 		}
-		val.SetKindCase(ctx.NewLiteral(optElemVal.GetValue()))
+		ctx.UpdateExpr(val, ctx.NewLiteral(optElemVal.GetValue()))
 		updatedField := ctx.NewStructField(field.Name(), val, false)
 		updatedFields = append(updatedFields, updatedField)
 	}
 	if modified {
-		e.SetKindCase(ctx.NewStruct(s.TypeName(), updatedFields))
+		ctx.UpdateExpr(e, ctx.NewStruct(s.TypeName(), updatedFields))
 	}
 }
 
@@ -457,7 +469,7 @@ func adaptLiteral(ctx *OptimizerContext, val ref.Val) (ast.Expr, error) {
 // Only comprehensions which are not nested are included as possible constant folds, and only
 // if all variables referenced in the comprehension stack exist are only iteration or
 // accumulation variables.
-func constantExprMatcher(e ast.NavigableExpr) bool {
+func constantExprMatcher(ctx *OptimizerContext, a *ast.AST, e ast.NavigableExpr) bool {
 	switch e.Kind() {
 	case ast.CallKind:
 		return constantCallMatcher(e)
@@ -477,6 +489,10 @@ func constantExprMatcher(e ast.NavigableExpr) bool {
 				vars[nested.IterVar()] = true
 			}
 			if e.Kind() == ast.IdentKind && !vars[e.AsIdent()] {
+				constantExprs = false
+			}
+			// Late-bound function calls cannot be folded.
+			if e.Kind() == ast.CallKind && isLateBoundFunctionCall(ctx, a, e) {
 				constantExprs = false
 			}
 		})
