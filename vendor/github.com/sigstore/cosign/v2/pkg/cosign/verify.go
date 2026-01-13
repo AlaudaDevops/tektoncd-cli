@@ -27,7 +27,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"os"
 	"regexp"
@@ -159,10 +158,6 @@ type CheckOpts struct {
 	// The amount of maximum workers for parallel executions.
 	// Defaults to 10.
 	MaxWorkers int
-
-	// Should the experimental OCI 1.1 behaviour be enabled or not.
-	// Defaults to false.
-	ExperimentalOCI11 bool
 }
 
 // This is a substitutable signature verification function that can be used for verifying
@@ -217,17 +212,9 @@ func verifyOCISignature(ctx context.Context, verifier signature.Verifier, sig pa
 	return verifier.VerifySignature(bytes.NewReader(signature), bytes.NewReader(payload), options.WithContext(ctx))
 }
 
-// ValidateAndUnpackCert creates a Verifier from a certificate. Verifies that the
-// certificate chains up to a trusted root using intermediate certificate chain coming from CheckOpts.
-// Optionally verifies the subject and issuer of the certificate.
+// ValidateAndUnpackCert creates a Verifier from a certificate. Veries that the certificate
+// chains up to a trusted root. Optionally verifies the subject and issuer of the certificate.
 func ValidateAndUnpackCert(cert *x509.Certificate, co *CheckOpts) (signature.Verifier, error) {
-	return ValidateAndUnpackCertWithIntermediates(cert, co, co.IntermediateCerts)
-}
-
-// ValidateAndUnpackCertWithIntermediates creates a Verifier from a certificate. Verifies that the
-// certificate chains up to a trusted root using intermediate cert passed as separate argument.
-// Optionally verifies the subject and issuer of the certificate.
-func ValidateAndUnpackCertWithIntermediates(cert *x509.Certificate, co *CheckOpts, intermediateCerts *x509.CertPool) (signature.Verifier, error) {
 	verifier, err := signature.LoadVerifier(cert.PublicKey, crypto.SHA256)
 	if err != nil {
 		return nil, fmt.Errorf("invalid certificate found on signature: %w", err)
@@ -248,8 +235,7 @@ func ValidateAndUnpackCertWithIntermediates(cert *x509.Certificate, co *CheckOpt
 	}
 
 	// Now verify the cert, then the signature.
-	chains, err := TrustedCert(cert, co.RootCerts, intermediateCerts)
-
+	chains, err := TrustedCert(cert, co.RootCerts, co.IntermediateCerts)
 	if err != nil {
 		return nil, err
 	}
@@ -484,15 +470,11 @@ func (fos *fakeOCISignatures) Get() ([]oci.Signature, error) {
 
 // VerifyImageSignatures does all the main cosign checks in a loop, returning the verified signatures.
 // If there were no valid signatures, we return an error.
-// Note that if co.ExperimentlOCI11 is set, we will attempt to verify
-// signatures using the experimental OCI 1.1 behavior.
 func VerifyImageSignatures(ctx context.Context, signedImgRef name.Reference, co *CheckOpts) (checkedSignatures []oci.Signature, bundleVerified bool, err error) {
-	// Try first using OCI 1.1 behavior if experimental flag is set.
-	if co.ExperimentalOCI11 {
-		verified, bundleVerified, err := verifyImageSignaturesExperimentalOCI(ctx, signedImgRef, co)
-		if err == nil {
-			return verified, bundleVerified, nil
-		}
+	// Try first using OCI 1.1 behavior
+	verified, bundleVerified, err := verifyImageSignaturesExperimentalOCI(ctx, signedImgRef, co)
+	if err == nil {
+		return verified, bundleVerified, nil
 	}
 
 	// Enforce this up front.
@@ -593,8 +575,8 @@ func verifySignatures(ctx context.Context, sigs oci.Signatures, h v1.Hash, co *C
 	}
 
 	if len(sl) == 0 {
-		return nil, false, &ErrNoSignaturesFound{
-			errors.New("no signatures found"),
+		return nil, false, &ErrNoMatchingSignatures{
+			errors.New("no matching signatures"),
 		}
 	}
 
@@ -666,12 +648,14 @@ func verifyInternal(ctx context.Context, sig oci.Signature, h v1.Hash,
 	bundleVerified bool, err error) {
 	var acceptableRFC3161Time, acceptableRekorBundleTime *time.Time // Timestamps for the signature we accept, or nil if not applicable.
 
-	acceptableRFC3161Timestamp, err := VerifyRFC3161Timestamp(sig, co)
-	if err != nil {
-		return false, fmt.Errorf("unable to verify RFC3161 timestamp bundle: %w", err)
-	}
-	if acceptableRFC3161Timestamp != nil {
-		acceptableRFC3161Time = &acceptableRFC3161Timestamp.Time
+	if co.TSARootCertificates != nil {
+		acceptableRFC3161Timestamp, err := VerifyRFC3161Timestamp(sig, co)
+		if err != nil {
+			return false, fmt.Errorf("unable to verify RFC3161 timestamp bundle: %w", err)
+		}
+		if acceptableRFC3161Timestamp != nil {
+			acceptableRFC3161Time = &acceptableRFC3161Timestamp.Time
+		}
 	}
 
 	if !co.IgnoreTlog {
@@ -731,21 +715,19 @@ func verifyInternal(ctx context.Context, sig oci.Signature, h v1.Hash,
 			return false, err
 		}
 		// If there is no chain annotation present, we preserve the pools set in the CheckOpts.
-		var pool *x509.CertPool
-		if len(chain) > 1 {
-			if co.IntermediateCerts == nil {
+		if len(chain) > 0 {
+			if len(chain) == 1 {
+				co.IntermediateCerts = nil
+			} else if co.IntermediateCerts == nil {
 				// If the intermediate certs have not been loaded in by TUF
-				pool = x509.NewCertPool()
+				pool := x509.NewCertPool()
 				for _, cert := range chain[:len(chain)-1] {
 					pool.AddCert(cert)
 				}
+				co.IntermediateCerts = pool
 			}
 		}
-		// In case pool is not set than set it from co.IntermediateCerts
-		if pool == nil {
-			pool = co.IntermediateCerts
-		}
-		verifier, err = ValidateAndUnpackCertWithIntermediates(cert, co, pool)
+		verifier, err = ValidateAndUnpackCert(cert, co)
 		if err != nil {
 			return false, err
 		}
@@ -835,7 +817,7 @@ func loadSignatureFromFile(ctx context.Context, sigRef string, signedImgRef name
 	var b64sig string
 	targetSig, err := blob.LoadFileOrURL(sigRef)
 	if err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
+		if !os.IsNotExist(err) {
 			return nil, err
 		}
 		targetSig = []byte(sigRef)
@@ -1117,17 +1099,13 @@ func VerifyBundle(sig oci.Signature, co *CheckOpts) (bool, error) {
 
 // VerifyRFC3161Timestamp verifies that the timestamp in sig is correctly signed, and if so,
 // returns the timestamp value.
-// It returns (nil, nil) if there is no timestamp, or (nil, err) if there is an invalid timestamp or if
-// no root is provided with a timestamp.
+// It returns (nil, nil) if there is no timestamp, or (nil, err) if there is an invalid timestamp.
 func VerifyRFC3161Timestamp(sig oci.Signature, co *CheckOpts) (*timestamp.Timestamp, error) {
 	ts, err := sig.RFC3161Timestamp()
-	switch {
-	case err != nil:
+	if err != nil {
 		return nil, err
-	case ts == nil:
+	} else if ts == nil {
 		return nil, nil
-	case co.TSARootCertificates == nil:
-		return nil, errors.New("no TSA root certificate(s) provided to verify timestamp")
 	}
 
 	b64Sig, err := sig.Base64Signature()

@@ -44,14 +44,12 @@ func (v Variable) String() string {
 
 const (
 	// Cosign environment variables
-	VariableExperimental            Variable = "COSIGN_EXPERIMENTAL"
-	VariableDockerMediaTypes        Variable = "COSIGN_DOCKER_MEDIA_TYPES"
-	VariablePassword                Variable = "COSIGN_PASSWORD"
-	VariablePKCS11Pin               Variable = "COSIGN_PKCS11_PIN"
-	VariablePKCS11ModulePath        Variable = "COSIGN_PKCS11_MODULE_PATH"
-	VariablePKCS11IgnoreCertificate Variable = "COSIGN_PKCS11_IGNORE_CERTIFICATE"
-	VariableRepository              Variable = "COSIGN_REPOSITORY"
-	VariableMaxAttachmentSize       Variable = "COSIGN_MAX_ATTACHMENT_SIZE"
+	VariableExperimental     Variable = "COSIGN_EXPERIMENTAL"
+	VariableDockerMediaTypes Variable = "COSIGN_DOCKER_MEDIA_TYPES"
+	VariablePassword         Variable = "COSIGN_PASSWORD"
+	VariablePKCS11Pin        Variable = "COSIGN_PKCS11_PIN"
+	VariablePKCS11ModulePath Variable = "COSIGN_PKCS11_MODULE_PATH"
+	VariableRepository       Variable = "COSIGN_REPOSITORY"
 
 	// Sigstore environment variables
 	VariableSigstoreCTLogPublicKeyFile Variable = "SIGSTORE_CT_LOG_PUBLIC_KEY_FILE"
@@ -104,19 +102,9 @@ var (
 			Expects:     "string with a module-path",
 			Sensitive:   false,
 		},
-		VariablePKCS11IgnoreCertificate: {
-			Description: "disables loading certificates with PKCS11",
-			Expects:     "1 if loading certificates should be disabled (0 by default)",
-			Sensitive:   false,
-		},
 		VariableRepository: {
 			Description: "can be used to store signatures in an alternate location",
 			Expects:     "string with a repository",
-			Sensitive:   false,
-		},
-		VariableMaxAttachmentSize: {
-			Description: "maximum attachment size to download (default 128MiB)",
-			Expects:     "human-readable unit of memory, e.g. 5120, 20K, 3M, 45MiB, 1GB",
 			Sensitive:   false,
 		},
 
