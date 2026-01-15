@@ -1,10 +1,10 @@
 name: Go Test For Alauda
 
-on:
+on:  # yamllint disable-line rule:truthy
   push:
-    branches: [ alauda-v* ]
+    branches: [alauda-v*]
   pull_request:
-    branches: [ alauda-v* ]
+    branches: [alauda-v*]
 
 jobs:
   test:

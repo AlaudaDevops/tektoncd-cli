@@ -54,7 +54,10 @@ vendor:
 	@$(GO) mod vendor
 
 .PHONY: cross
-cross: amd64 386 arm arm64 s390x ppc64le ## build cross platform binaries
+cross: ## build cross platform binaries
+	# Linux-only build matrix for CI; other architectures live under amd64/arm/arm64/386/s390x/ppc64le targets.
+	GOOS=linux GOARCH=amd64 go build -mod=vendor $(LDFLAGS) -o bin/tkn-linux-amd64 ./cmd/tkn
+	GOOS=linux GOARCH=arm64 go build -mod=vendor $(LDFLAGS) -o bin/tkn-linux-arm64 ./cmd/tkn
 
 .PHONY: amd64
 amd64:
@@ -75,6 +78,7 @@ arm:
 arm64:
 	GOOS=linux GOARCH=arm64 go build -mod=vendor $(LDFLAGS) -o bin/tkn-linux-arm64 ./cmd/tkn
 	GOOS=darwin GOARCH=arm64 go build -mod=vendor $(LDFLAGS) -o bin/tkn-darwin-arm64 ./cmd/tkn
+
 
 .PHONY: s390x
 s390x:
