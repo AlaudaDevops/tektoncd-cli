@@ -1,3 +1,15 @@
+# v1.49.1 (2025-11-25)
+
+* **Bug Fix**: Add error check for endpoint param binding during auth scheme resolution to fix panic reported in #3234
+
+# v1.49.0 (2025-11-21)
+
+* **Feature**: Support for on-demand rotation of AWS KMS Multi-Region keys with imported key material
+
+# v1.48.3 (2025-11-19.2)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
 # v1.48.2 (2025-11-12)
 
 * **Bug Fix**: Further reduce allocation overhead when the metrics system isn't in-use.
