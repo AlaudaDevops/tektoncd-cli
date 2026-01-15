@@ -31,18 +31,18 @@ jobs:
 
           PREFIX="${BRANCH_NAME%%-*}"  # alauda
           BASE_VERSION="${BRANCH_NAME#${PREFIX}-}"  # v0.62.1
-          
+
           VERSION_NO_V="${BASE_VERSION#v}"              # 0.62.1
           MAJOR=$(echo "$VERSION_NO_V" | cut -d. -f1)
           MINOR=$(echo "$VERSION_NO_V" | cut -d. -f2)
           PATCH=$(echo "$VERSION_NO_V" | cut -d. -f3)
-          
+
           echo "MAJOR: $MAJOR, MINOR: $MINOR, PATCH: $PATCH"
-          
+
           # PATCH + 1
           NEXT_PATCH=$((PATCH + 1))
           echo "NEXT_PATCH=$NEXT_PATCH"
-          
+
           NEXT_VERSION="v${MAJOR}.${MINOR}.${NEXT_PATCH}"   # v0.62.2
           echo "NEXT_VERSION=$NEXT_VERSION"
 

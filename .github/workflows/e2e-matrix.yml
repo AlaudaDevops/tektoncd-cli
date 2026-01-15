@@ -30,6 +30,7 @@ jobs:
       KO_DOCKER_REPO: registry.local:5000/tekton
       CLUSTER_DOMAIN: c${{ github.run_id }}.local
       ARTIFACTS: ${{ github.workspace }}/artifacts
+      GOTOOLCHAIN: auto
 
     steps:
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
@@ -52,6 +53,8 @@ jobs:
         echo "${GOPATH}/bin" >> "$GITHUB_PATH"
 
     - name: Run tests
+      env:
+        GOTOOLCHAIN: auto
       run: |
         ./hack/setup-kind.sh \
           --registry-url $(echo ${KO_DOCKER_REPO} | cut -d'/' -f 1) \

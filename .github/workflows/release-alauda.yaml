@@ -1,10 +1,10 @@
 name: Release Alauda
 
-on:
+on:  # yamllint disable-line rule:truthy
   push:
     tags:
       - "v*-alauda-*"
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: write  # create releases
