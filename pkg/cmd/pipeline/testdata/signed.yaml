@@ -2,8 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   annotations:
-    tekton.dev/signature: MEQCIBDVXccTNiMHhROdMcxCFwHGDCeJ5VDHZPny5XmDpzp8AiBMUGBwrhQFfBYXMydvi//Un5JxF6nLqsHfIIU4+d/FgA==
-  creationTimestamp: null
+    tekton.dev/signature: MEYCIQDv8pNdA/FthkZ3pNFLzli9cQXHubBysGNVkWrjamMurgIhAJjQcgJ5CIncJH6qatCYmg093fFHAEqFRIPTEacvL9TD
   name: test-pipeline
 spec:
   resources:
