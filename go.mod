@@ -374,4 +374,4 @@ require (
 replace github.com/sigstore/timestamp-authority => github.com/alaudadevops/timestamp-authority v1.2.10-alauda.3
 
 // Because when upgrading chains, the pipeline version was automatically updated to v1.3.1, but the previous cli depended on v1.0.0. To be safe, still replace it to the previous version.
-replace github.com/tektoncd/pipeline => github.com/tektoncd/pipeline v1.0.0
+replace github.com/tektoncd/pipeline => github.com/tektoncd/pipeline v1.1.0
