@@ -25,7 +25,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/tektoncd/chains v0.26.0
 	github.com/tektoncd/hub v1.21.0
-	github.com/tektoncd/pipeline v1.3.1
+	github.com/tektoncd/pipeline v1.10.1
 	github.com/tektoncd/plumbing v0.0.0-20250430145243-3b7cd59879c1
 	github.com/tektoncd/triggers v0.32.0
 	github.com/theupdateframework/go-tuf v0.7.0
@@ -374,4 +374,4 @@ require (
 replace github.com/sigstore/timestamp-authority => github.com/alaudadevops/timestamp-authority v1.2.10-alauda.3
 
 // Because when upgrading chains, the pipeline version was automatically updated to v1.3.1, but the previous cli depended on v1.0.0. To be safe, still replace it to the previous version.
-replace github.com/tektoncd/pipeline => github.com/tektoncd/pipeline v1.0.0
+replace github.com/tektoncd/pipeline => github.com/tektoncd/pipeline v1.10.1
