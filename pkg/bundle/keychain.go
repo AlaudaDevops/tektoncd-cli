@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"sync"
 
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/types"
-	"github.com/docker/docker/pkg/homedir"
 	"github.com/google/go-containerregistry/pkg/authn"
 )
 
@@ -66,7 +66,7 @@ func getPathToPodmanAuth() string {
 	)
 
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
-		return filepath.Join(homedir.Get(), nonLinuxAuthFilePath)
+		return filepath.Join(getHomeDir(), nonLinuxAuthFilePath)
 	}
 
 	runtimeDir := os.Getenv("XDG_RUNTIME_DIR")
@@ -74,4 +74,14 @@ func getPathToPodmanAuth() string {
 		return filepath.Join(runtimeDir, xdgRuntimeDirPath)
 	}
 	return fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())
+}
+
+func getHomeDir() string {
+	home, _ := os.UserHomeDir()
+	if home == "" && runtime.GOOS != "windows" {
+		if u, err := user.Current(); err == nil {
+			return u.HomeDir
+		}
+	}
+	return home
 }
