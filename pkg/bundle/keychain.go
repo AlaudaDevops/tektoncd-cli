@@ -10,8 +10,8 @@ import (
 
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/types"
-	"github.com/docker/docker/pkg/homedir"
 	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/mitchellh/go-homedir"
 )
 
 type podmanKeychain struct {
@@ -66,7 +66,8 @@ func getPathToPodmanAuth() string {
 	)
 
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
-		return filepath.Join(homedir.Get(), nonLinuxAuthFilePath)
+		homeDir, _ := homedir.Dir()
+		return filepath.Join(homeDir, nonLinuxAuthFilePath)
 	}
 
 	runtimeDir := os.Getenv("XDG_RUNTIME_DIR")

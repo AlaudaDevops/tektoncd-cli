@@ -9,7 +9,6 @@ require (
 	github.com/cpuguy83/go-md2man v1.0.10
 	github.com/creack/pty v1.1.24
 	github.com/docker/cli v29.2.0+incompatible
-	github.com/docker/docker v28.5.2+incompatible
 	github.com/fatih/color v1.18.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.20.7
@@ -154,7 +153,7 @@ require (
 	github.com/gdamore/tcell/v2 v2.9.0 // indirect
 	github.com/go-chi/chi/v5 v5.2.4 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
