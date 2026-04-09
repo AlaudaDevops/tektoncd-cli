@@ -24,7 +24,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/tektoncd/chains v0.26.0
 	github.com/tektoncd/hub v1.21.0
-	github.com/tektoncd/pipeline v1.3.1
+	github.com/tektoncd/pipeline v1.3.3
 	github.com/tektoncd/plumbing v0.0.0-20250430145243-3b7cd59879c1
 	github.com/tektoncd/triggers v0.32.0
 	github.com/theupdateframework/go-tuf v0.7.0
