@@ -37,7 +37,7 @@ var stepCounter uint64
 
 // ColorStatus Get a status coloured
 func ColorStatus(status string) string {
-	return color.New(ConditionColor[status]).Sprint(status)
+	return newColor(ConditionColor[status]).Sprint(status)
 }
 
 // AutoStepName when our stepName is empty return a generated name as generated

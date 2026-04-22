@@ -16,6 +16,15 @@ const (
 	tknPrefix    = "tkn-"
 )
 
+func isValidPluginName(pluginName string) bool {
+	if pluginName == "" {
+		return false
+	}
+	// Plugin invocations map to a single executable name, so path separators are
+	// never valid user input here.
+	return !strings.ContainsAny(pluginName, `/\`)
+}
+
 func getPluginDir() (string, error) {
 	dir := os.Getenv(pluginDirEnv)
 	// if TKN_PLUGINS_DIR is set, follow it
@@ -32,6 +41,10 @@ func getPluginDir() (string, error) {
 
 // Find a binary in plugin homedir directory or user paths.
 func FindPlugin(pluginame string) (string, error) {
+	if !isValidPluginName(pluginame) {
+		return "", fmt.Errorf("invalid plugin name: %s", pluginame)
+	}
+
 	cmd := tknPrefix + pluginame
 	dir, _ := getPluginDir()
 	path := filepath.Join(dir, cmd)
@@ -70,8 +83,7 @@ func GetAllTknPluginFromPaths() []string {
 				if contains(pluginlist, basep) {
 					continue
 				}
-				fpath := filepath.Join(path, file.Name())
-				info, err := os.Stat(fpath)
+				info, err := file.Info()
 				if err != nil {
 					continue
 				}

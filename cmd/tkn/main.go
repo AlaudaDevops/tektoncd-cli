@@ -39,6 +39,8 @@ func main() {
 		}
 
 		// if we have found the plugin then sysexec it by replacing current process.
+		// #nosec G702 -- exCmd is resolved by plugins.FindPlugin from a validated plugin
+		// name to an actual tkn-* executable in the configured plugin dir or PATH.
 		if err := syscall.Exec(exCmd, append([]string{exCmd}, os.Args[2:]...), os.Environ()); err != nil {
 			fmt.Fprintf(os.Stderr, "Command finished with error: %v", err)
 			os.Exit(127)
