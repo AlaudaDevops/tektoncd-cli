@@ -109,8 +109,9 @@ func initializeLogsAndMetrics(t *testing.T) {
 		flag.Parse()
 		flag.Set("alsologtostderr", "true")
 		logging.InitializeLogger()
-
-		logging.InitializeMetricExporter(t.Name())
+		// knative.dev/pkg removed the explicit test metrics exporter hook, so logger
+		// initialization is the only setup still required for this shared test helper.
+		_ = t.Name()
 	})
 }
 
