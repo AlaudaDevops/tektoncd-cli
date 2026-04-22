@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	pipelinev1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	apispipelinev1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/tektoncd/pipeline/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1"
+	pipelinev1 "github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -36,7 +36,7 @@ import (
 // Tasks.
 type TaskInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.TaskLister
+	Lister() pipelinev1.TaskLister
 }
 
 type taskInformer struct {
@@ -57,21 +57,33 @@ func NewTaskInformer(client versioned.Interface, namespace string, resyncPeriod 
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredTaskInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TektonV1().Tasks(namespace).List(context.TODO(), options)
+				return client.TektonV1().Tasks(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TektonV1().Tasks(namespace).Watch(context.TODO(), options)
+				return client.TektonV1().Tasks(namespace).Watch(context.Background(), options)
 			},
-		},
-		&pipelinev1.Task{},
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TektonV1().Tasks(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TektonV1().Tasks(namespace).Watch(ctx, options)
+			},
+		}, client),
+		&apispipelinev1.Task{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +94,9 @@ func (f *taskInformer) defaultInformer(client versioned.Interface, resyncPeriod 
 }
 
 func (f *taskInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&pipelinev1.Task{}, f.defaultInformer)
+	return f.factory.InformerFor(&apispipelinev1.Task{}, f.defaultInformer)
 }
 
-func (f *taskInformer) Lister() v1.TaskLister {
-	return v1.NewTaskLister(f.Informer().GetIndexer())
+func (f *taskInformer) Lister() pipelinev1.TaskLister {
+	return pipelinev1.NewTaskLister(f.Informer().GetIndexer())
 }

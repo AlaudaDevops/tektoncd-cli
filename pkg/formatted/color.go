@@ -34,6 +34,18 @@ var (
 	}
 )
 
+const paletteSize uint32 = 5
+
+func newColor(attrs ...color.Attribute) *color.Color {
+	c := color.New(attrs...)
+	// fatih/color now snapshots NO_COLOR into each Color instance at construction time.
+	// Re-enable explicit color output when this package has already decided colors are allowed.
+	if !color.NoColor {
+		c.EnableColor()
+	}
+	return c
+}
+
 // DecorateAttr decorate strings with a color or an emoji, respecting the user
 // preference if no colour needed.
 func DecorateAttr(attrString, message string) string {
@@ -83,7 +95,7 @@ func DecorateAttr(attrString, message string) string {
 	case "underline":
 		attr = color.Underline
 	case "underline bold":
-		return color.New(color.Underline).Add(color.Bold).Sprintf("%s", message)
+		return newColor(color.Underline).Add(color.Bold).Sprintf("%s", message)
 	case "bold":
 		attr = color.Bold
 	case "yellow":
@@ -104,18 +116,18 @@ func DecorateAttr(attrString, message string) string {
 		attr = color.FgHiWhite
 	}
 
-	return color.New(attr).Sprintf("%s", message)
+	return newColor(attr).Sprintf("%s", message)
 }
 
 type atomicCounter struct {
 	value     uint32
-	threshold int
+	threshold uint32
 }
 
 func (c *atomicCounter) next() int {
 	v := atomic.AddUint32(&c.value, 1)
-	next := int(v-1) % c.threshold
-	atomic.CompareAndSwapUint32(&c.value, uint32(c.threshold), 0)
+	next := int((v - 1) % c.threshold)
+	atomic.CompareAndSwapUint32(&c.value, c.threshold, 0)
 	return next
 
 }
@@ -127,7 +139,9 @@ type rainbow struct {
 
 func newRainbow() *rainbow {
 	return &rainbow{
-		counter: atomicCounter{threshold: len(palette)},
+		// Keep the threshold aligned with the fixed palette above so the atomic
+		// counter never needs a signed-to-unsigned conversion at runtime.
+		counter: atomicCounter{threshold: paletteSize},
 	}
 }
 
@@ -145,7 +159,7 @@ func (r *rainbow) get(x string) color.Attribute {
 // the first argument is a label to keep the same colour on.
 func (r *rainbow) Fprintf(label string, w io.Writer, format string, args ...interface{}) {
 	attribute := r.get(label)
-	crainbow := color.Set(attribute).Add(color.Bold)
+	crainbow := newColor(attribute).Add(color.Bold)
 	crainbow.Fprintf(w, format, args...)
 }
 
@@ -162,8 +176,8 @@ func NewColor() *Color {
 	return &Color{
 		Rainbow: newRainbow(),
 
-		red:  color.New(color.FgRed),
-		blue: color.New(color.FgBlue),
+		red:  newColor(color.FgRed),
+		blue: newColor(color.FgBlue),
 	}
 }
 

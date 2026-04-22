@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	triggersv1beta1 "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
+	apistriggersv1beta1 "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	versioned "github.com/tektoncd/triggers/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/tektoncd/triggers/pkg/client/informers/externalversions/internalinterfaces"
-	v1beta1 "github.com/tektoncd/triggers/pkg/client/listers/triggers/v1beta1"
+	triggersv1beta1 "github.com/tektoncd/triggers/pkg/client/listers/triggers/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -36,7 +36,7 @@ import (
 // Triggers.
 type TriggerInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.TriggerLister
+	Lister() triggersv1beta1.TriggerLister
 }
 
 type triggerInformer struct {
@@ -57,21 +57,33 @@ func NewTriggerInformer(client versioned.Interface, namespace string, resyncPeri
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredTriggerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TriggersV1beta1().Triggers(namespace).List(context.TODO(), options)
+				return client.TriggersV1beta1().Triggers(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TriggersV1beta1().Triggers(namespace).Watch(context.TODO(), options)
+				return client.TriggersV1beta1().Triggers(namespace).Watch(context.Background(), options)
 			},
-		},
-		&triggersv1beta1.Trigger{},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TriggersV1beta1().Triggers(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TriggersV1beta1().Triggers(namespace).Watch(ctx, options)
+			},
+		}, client),
+		&apistriggersv1beta1.Trigger{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +94,9 @@ func (f *triggerInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *triggerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&triggersv1beta1.Trigger{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistriggersv1beta1.Trigger{}, f.defaultInformer)
 }
 
-func (f *triggerInformer) Lister() v1beta1.TriggerLister {
-	return v1beta1.NewTriggerLister(f.Informer().GetIndexer())
+func (f *triggerInformer) Lister() triggersv1beta1.TriggerLister {
+	return triggersv1beta1.NewTriggerLister(f.Informer().GetIndexer())
 }

@@ -79,10 +79,11 @@ type CustomResource struct {
 }
 
 type KubernetesResource struct {
-	Replicas           *int32             `json:"replicas,omitempty"`
-	ServiceType        corev1.ServiceType `json:"serviceType,omitempty"`
-	ServicePort        *int32             `json:"servicePort,omitempty"`
-	duckv1.WithPodSpec `json:"spec,omitempty"`
+	Replicas                 *int32             `json:"replicas,omitempty"`
+	ServiceType              corev1.ServiceType `json:"serviceType,omitempty"`
+	ServicePort              *int32             `json:"servicePort,omitempty"`
+	ServiceLoadBalancerClass *string            `json:"serviceLoadBalancerClass,omitempty"`
+	duckv1.WithPodSpec       `json:"spec,omitempty"`
 }
 
 // EventListenerTrigger represents a connection between TriggerBinding, Params,
@@ -155,7 +156,7 @@ type EventListenerStatus struct {
 	duckv1.Status `json:",inline"`
 
 	// EventListener is Addressable. It currently exposes the service DNS
-	// address of the the EventListener sink
+	// address of the EventListener sink
 	v1beta1.AddressStatus `json:",inline"`
 
 	// Configuration stores configuration for the EventListener service

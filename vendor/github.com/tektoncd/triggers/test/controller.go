@@ -102,7 +102,7 @@ type Assets struct {
 
 func init() {
 	// Register a separate fake dynamic client with out schemes.
-	injection.Fake.RegisterClient(func(ctx context.Context, cfg *rest.Config) context.Context {
+	injection.Fake.RegisterClient(func(ctx context.Context, _ *rest.Config) context.Context {
 		scheme := runtime.NewScheme()
 		err := servingv1.AddToScheme(scheme)
 		if err != nil {
@@ -120,7 +120,8 @@ func SetupFakeContext(t testing.TB) (context.Context, []controller.Informer) {
 }
 
 // SeedResources returns Clients populated with the given Resources
-// nolint: revive
+//
+//nolint:revive
 func SeedResources(t *testing.T, ctx context.Context, r Resources) Clients {
 	t.Helper()
 	c := Clients{
@@ -286,7 +287,8 @@ func SeedResources(t *testing.T, ctx context.Context, r Resources) Clients {
 
 // GetResourcesFromClients returns the Resources in the Clients provided
 // Precondition: all Namespaces used in Resources must be listed in Resources.Namespaces
-// nolint: golint
+//
+//nolint:golint
 func GetResourcesFromClients(c Clients) (*Resources, error) {
 	testResources := &Resources{}
 	// Add ClusterTriggerBindings
@@ -390,7 +392,6 @@ func GetResourcesFromClients(c Clients) (*Resources, error) {
 			}
 			testResources.WithPod = append(testResources.WithPod, withPod.DeepCopy())
 		}
-
 	}
 	return testResources, nil
 }

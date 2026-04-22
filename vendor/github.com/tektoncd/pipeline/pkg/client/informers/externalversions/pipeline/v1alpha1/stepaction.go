@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	pipelinev1alpha1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
+	apispipelinev1alpha1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/tektoncd/pipeline/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1alpha1"
+	pipelinev1alpha1 "github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -36,7 +36,7 @@ import (
 // StepActions.
 type StepActionInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.StepActionLister
+	Lister() pipelinev1alpha1.StepActionLister
 }
 
 type stepActionInformer struct {
@@ -57,21 +57,33 @@ func NewStepActionInformer(client versioned.Interface, namespace string, resyncP
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredStepActionInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TektonV1alpha1().StepActions(namespace).List(context.TODO(), options)
+				return client.TektonV1alpha1().StepActions(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TektonV1alpha1().StepActions(namespace).Watch(context.TODO(), options)
+				return client.TektonV1alpha1().StepActions(namespace).Watch(context.Background(), options)
 			},
-		},
-		&pipelinev1alpha1.StepAction{},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TektonV1alpha1().StepActions(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TektonV1alpha1().StepActions(namespace).Watch(ctx, options)
+			},
+		}, client),
+		&apispipelinev1alpha1.StepAction{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +94,9 @@ func (f *stepActionInformer) defaultInformer(client versioned.Interface, resyncP
 }
 
 func (f *stepActionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&pipelinev1alpha1.StepAction{}, f.defaultInformer)
+	return f.factory.InformerFor(&apispipelinev1alpha1.StepAction{}, f.defaultInformer)
 }
 
-func (f *stepActionInformer) Lister() v1alpha1.StepActionLister {
-	return v1alpha1.NewStepActionLister(f.Informer().GetIndexer())
+func (f *stepActionInformer) Lister() pipelinev1alpha1.StepActionLister {
+	return pipelinev1alpha1.NewStepActionLister(f.Informer().GetIndexer())
 }

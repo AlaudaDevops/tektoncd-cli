@@ -18,10 +18,10 @@ package testing
 
 import (
 	"context"
+	"os"
+	"sync/atomic"
 	"testing"
 	"time"
-
-	"go.uber.org/atomic"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +38,15 @@ import (
 	logtesting "knative.dev/pkg/logging/testing"
 )
 
+func init() {
+	// Disable WatchListClient feature in tests to work around K8s 1.35 issue where
+	// kubernetes.Interface doesn't expose IsWatchListSemanticsUnSupported(), preventing
+	// fake clients from being detected. This causes tests to timeout waiting for bookmark
+	// events that fake clients don't send.
+	// See: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/3157-watch-list/README.md
+	os.Setenv("KUBE_FEATURE_WatchListClient", "false")
+}
+
 // SetupFakeContext sets up the the Context and the fake informers for the tests.
 // The optional fs() can be used to edit ctx before the SetupInformer steps
 func SetupFakeContext(t testing.TB, fs ...func(context.Context) context.Context) (context.Context, []controller.Informer) {
@@ -52,9 +61,11 @@ func SetupFakeContextWithCancel(t testing.TB, fs ...func(context.Context) contex
 	ctx, c := context.WithCancel(logtesting.TestContextWithLogger(t))
 	ctx = controller.WithEventRecorder(ctx, record.NewFakeRecorder(1000))
 	for _, f := range fs {
-		ctx = f(ctx)
+		ctx = f(ctx) //nolint:fatcontext
 	}
-	ctx, is := injection.Fake.SetupInformers(ctx, &rest.Config{})
+	ctx = injection.WithConfig(ctx, &rest.Config{})
+
+	ctx, is := injection.Fake.SetupInformers(ctx, injection.GetConfig(ctx))
 	return ctx, c, is
 }
 
@@ -94,7 +105,7 @@ func RunAndSyncInformers(ctx context.Context, informers ...controller.Informer) 
 
 		c.PrependReactor("list", "*", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
 			// Every list (before actual informer usage) is going to be followed by a Watch call.
-			watchesPending.Inc()
+			watchesPending.Add(1)
 			return false, nil, nil
 		})
 
@@ -108,7 +119,7 @@ func RunAndSyncInformers(ctx context.Context, informers ...controller.Informer) 
 				return false, nil, err
 			}
 
-			watchesPending.Dec()
+			watchesPending.Add(-1)
 
 			return true, watch, nil
 		})
@@ -119,7 +130,7 @@ func RunAndSyncInformers(ctx context.Context, informers ...controller.Informer) 
 		return wf, err
 	}
 
-	err = wait.PollImmediate(time.Microsecond, wait.ForeverTestTimeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, time.Microsecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		if watchesPending.Load() == 0 {
 			return true, nil
 		}

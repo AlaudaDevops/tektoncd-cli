@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	triggersv1alpha1 "github.com/tektoncd/triggers/pkg/apis/triggers/v1alpha1"
+	apistriggersv1alpha1 "github.com/tektoncd/triggers/pkg/apis/triggers/v1alpha1"
 	versioned "github.com/tektoncd/triggers/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/tektoncd/triggers/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/tektoncd/triggers/pkg/client/listers/triggers/v1alpha1"
+	triggersv1alpha1 "github.com/tektoncd/triggers/pkg/client/listers/triggers/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -36,7 +36,7 @@ import (
 // EventListeners.
 type EventListenerInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.EventListenerLister
+	Lister() triggersv1alpha1.EventListenerLister
 }
 
 type eventListenerInformer struct {
@@ -57,21 +57,33 @@ func NewEventListenerInformer(client versioned.Interface, namespace string, resy
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredEventListenerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TriggersV1alpha1().EventListeners(namespace).List(context.TODO(), options)
+				return client.TriggersV1alpha1().EventListeners(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TriggersV1alpha1().EventListeners(namespace).Watch(context.TODO(), options)
+				return client.TriggersV1alpha1().EventListeners(namespace).Watch(context.Background(), options)
 			},
-		},
-		&triggersv1alpha1.EventListener{},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TriggersV1alpha1().EventListeners(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TriggersV1alpha1().EventListeners(namespace).Watch(ctx, options)
+			},
+		}, client),
+		&apistriggersv1alpha1.EventListener{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +94,9 @@ func (f *eventListenerInformer) defaultInformer(client versioned.Interface, resy
 }
 
 func (f *eventListenerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&triggersv1alpha1.EventListener{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistriggersv1alpha1.EventListener{}, f.defaultInformer)
 }
 
-func (f *eventListenerInformer) Lister() v1alpha1.EventListenerLister {
-	return v1alpha1.NewEventListenerLister(f.Informer().GetIndexer())
+func (f *eventListenerInformer) Lister() triggersv1alpha1.EventListenerLister {
+	return triggersv1alpha1.NewEventListenerLister(f.Informer().GetIndexer())
 }

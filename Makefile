@@ -11,7 +11,7 @@ M = $(shell printf "\033[34;1m🐱\033[0m")
 TIMEOUT_UNIT = 5m
 TIMEOUT_E2E  = 20m
 
-GOLANGCI_VERSION = v1.55.2
+GOLANGCI_VERSION = v1.64.8
 
 YAML_FILES := $(shell find . -type f -regex ".*y[a]ml" -print)
 

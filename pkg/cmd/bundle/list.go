@@ -28,7 +28,7 @@ import (
 
 // TODO: Find a more generic way to do this
 var (
-	allowedKinds = []string{"task", "pipeline", "clustertask"}
+	allowedKinds = []string{"task", "pipeline"}
 )
 
 func normalizeKind(kind string) string {
@@ -80,7 +80,7 @@ Caching:
 			"kubernetes":  "false",
 		},
 		Args: cobra.RangeArgs(1, 3),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(_ *cobra.Command, args []string) error {
 			if len(args) < 1 {
 				return errInvalidRef
 			}

@@ -8,7 +8,6 @@ tkn [command]
 Available Commands:
   bundle*               Manage Tekton Bundles (experimental)
   chain                 Manage Chains
-  clustertask           Manage ClusterTasks
   clustertriggerbinding Manage ClusterTriggerBindings
   eventlistener         Manage EventListeners
   hub                   Interact with tekton hub

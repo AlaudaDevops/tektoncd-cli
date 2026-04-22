@@ -38,7 +38,6 @@ type LogOptions struct {
 	PipelineName    string
 	PipelineRunName string
 	TaskName        string
-	ClusterTaskName string
 	TaskrunName     string
 	Stream          *cli.Stream
 	Streamer        stream.NewStreamerFunc
@@ -99,8 +98,6 @@ func (opts *LogOptions) Ask(resource string, options []string) error {
 		opts.PipelineRunName = strings.Fields(ans)[0]
 	case ResourceNameTask:
 		opts.TaskName = ans
-	case ResourceNameClusterTask:
-		opts.ClusterTaskName = ans
 	case ResourceNameTaskRun:
 		opts.TaskrunName = strings.Fields(ans)[0]
 	}
@@ -120,7 +117,7 @@ func (opts *LogOptions) FuzzyAsk(resource string, options []string) error {
 		func(i int) string {
 			return strings.Fields(options[i])[0]
 		},
-		fuzzyfinder.WithPreviewWindow(func(i, w, h int) string {
+		fuzzyfinder.WithPreviewWindow(func(i, _, _ int) string {
 			if i == -1 {
 				return ""
 			}
@@ -160,8 +157,6 @@ func (opts *LogOptions) FuzzyAsk(resource string, options []string) error {
 		opts.PipelineRunName = strings.Fields(ans)[0]
 	case ResourceNameTask:
 		opts.TaskName = ans
-	case ResourceNameClusterTask:
-		opts.ClusterTaskName = ans
 	case ResourceNameTaskRun:
 		opts.TaskrunName = strings.Fields(ans)[0]
 	}

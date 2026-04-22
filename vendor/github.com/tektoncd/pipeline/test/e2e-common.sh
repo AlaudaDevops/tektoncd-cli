@@ -18,6 +18,26 @@
 
 source $(git rev-parse --show-toplevel)/vendor/github.com/tektoncd/plumbing/scripts/e2e-tests.sh
 
+# Run the given five times or until it succeeds.
+# Sleeps 5 seconds after earch retry.
+# example usage: `with_retries ping fakeserver.com`
+function with_retries() (
+  set +eo pipefail
+
+  success=""
+  for retry in 1 2 3 4 5; do
+    "$@"
+    success="$?"
+    if [ "${success}" -eq "0" ]; then
+      break
+    fi
+    sleep 5
+    [[ "${retry}" !=  "5" ]] && echo "Retrying..."
+  done
+
+  return "${success}"
+)
+
 function install_pipeline_crd() {
   echo ">> Deploying Tekton Pipelines"
   local ko_target="$(mktemp)"
@@ -31,8 +51,6 @@ function install_pipeline_crd() {
   verify_pipeline_installation
   verify_resolvers_installation
   verify_log_access_enabled
-
-  export SYSTEM_NAMESPACE=tekton-pipelines
 }
 
 # Install the Tekton pipeline crd based on the release number
@@ -155,7 +173,7 @@ function uninstall_pipeline_crd_version() {
 }
 
 function delete_tekton_resources() {
-  for res in tasks clustertasks pipelines taskruns pipelineruns; do
+  for res in tasks pipelines taskruns pipelineruns; do
     echo ">> Deleting ${res}"
     kubectl delete --ignore-not-found=true ${res}.tekton.dev --all
   done

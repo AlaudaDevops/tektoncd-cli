@@ -109,8 +109,9 @@ func initializeLogsAndMetrics(t *testing.T) {
 		flag.Parse()
 		flag.Set("alsologtostderr", "true")
 		logging.InitializeLogger()
-
-		logging.InitializeMetricExporter(t.Name())
+		// knative.dev/pkg removed the explicit test metrics exporter hook, so logger
+		// initialization is the only setup still required for this shared test helper.
+		_ = t.Name()
 	})
 }
 
@@ -176,7 +177,7 @@ func VerifyServiceAccountExistenceForSecrets(namespace string, kubeClient kubern
 
 func getCRDYaml(cs *Clients, ns string) ([]byte, error) {
 	var output []byte
-	printOrAdd := func(kind, name string, i interface{}) {
+	printOrAdd := func(_, _ string, i interface{}) {
 		bs, err := yaml.Marshal(i)
 		if err != nil {
 			return

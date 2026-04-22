@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	triggersv1alpha1 "github.com/tektoncd/triggers/pkg/apis/triggers/v1alpha1"
+	apistriggersv1alpha1 "github.com/tektoncd/triggers/pkg/apis/triggers/v1alpha1"
 	versioned "github.com/tektoncd/triggers/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/tektoncd/triggers/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/tektoncd/triggers/pkg/client/listers/triggers/v1alpha1"
+	triggersv1alpha1 "github.com/tektoncd/triggers/pkg/client/listers/triggers/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -36,7 +36,7 @@ import (
 // ClusterInterceptors.
 type ClusterInterceptorInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ClusterInterceptorLister
+	Lister() triggersv1alpha1.ClusterInterceptorLister
 }
 
 type clusterInterceptorInformer struct {
@@ -56,21 +56,33 @@ func NewClusterInterceptorInformer(client versioned.Interface, resyncPeriod time
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredClusterInterceptorInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TriggersV1alpha1().ClusterInterceptors().List(context.TODO(), options)
+				return client.TriggersV1alpha1().ClusterInterceptors().List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TriggersV1alpha1().ClusterInterceptors().Watch(context.TODO(), options)
+				return client.TriggersV1alpha1().ClusterInterceptors().Watch(context.Background(), options)
 			},
-		},
-		&triggersv1alpha1.ClusterInterceptor{},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TriggersV1alpha1().ClusterInterceptors().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TriggersV1alpha1().ClusterInterceptors().Watch(ctx, options)
+			},
+		}, client),
+		&apistriggersv1alpha1.ClusterInterceptor{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +93,9 @@ func (f *clusterInterceptorInformer) defaultInformer(client versioned.Interface,
 }
 
 func (f *clusterInterceptorInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&triggersv1alpha1.ClusterInterceptor{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistriggersv1alpha1.ClusterInterceptor{}, f.defaultInformer)
 }
 
-func (f *clusterInterceptorInformer) Lister() v1alpha1.ClusterInterceptorLister {
-	return v1alpha1.NewClusterInterceptorLister(f.Informer().GetIndexer())
+func (f *clusterInterceptorInformer) Lister() triggersv1alpha1.ClusterInterceptorLister {
+	return triggersv1alpha1.NewClusterInterceptorLister(f.Informer().GetIndexer())
 }

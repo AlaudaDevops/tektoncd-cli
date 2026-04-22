@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	resolutionv1beta1 "github.com/tektoncd/pipeline/pkg/apis/resolution/v1beta1"
+	apisresolutionv1beta1 "github.com/tektoncd/pipeline/pkg/apis/resolution/v1beta1"
 	versioned "github.com/tektoncd/pipeline/pkg/client/resolution/clientset/versioned"
 	internalinterfaces "github.com/tektoncd/pipeline/pkg/client/resolution/informers/externalversions/internalinterfaces"
-	v1beta1 "github.com/tektoncd/pipeline/pkg/client/resolution/listers/resolution/v1beta1"
+	resolutionv1beta1 "github.com/tektoncd/pipeline/pkg/client/resolution/listers/resolution/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -36,7 +36,7 @@ import (
 // ResolutionRequests.
 type ResolutionRequestInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.ResolutionRequestLister
+	Lister() resolutionv1beta1.ResolutionRequestLister
 }
 
 type resolutionRequestInformer struct {
@@ -57,21 +57,33 @@ func NewResolutionRequestInformer(client versioned.Interface, namespace string, 
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredResolutionRequestInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ResolutionV1beta1().ResolutionRequests(namespace).List(context.TODO(), options)
+				return client.ResolutionV1beta1().ResolutionRequests(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ResolutionV1beta1().ResolutionRequests(namespace).Watch(context.TODO(), options)
+				return client.ResolutionV1beta1().ResolutionRequests(namespace).Watch(context.Background(), options)
 			},
-		},
-		&resolutionv1beta1.ResolutionRequest{},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ResolutionV1beta1().ResolutionRequests(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ResolutionV1beta1().ResolutionRequests(namespace).Watch(ctx, options)
+			},
+		}, client),
+		&apisresolutionv1beta1.ResolutionRequest{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +94,9 @@ func (f *resolutionRequestInformer) defaultInformer(client versioned.Interface, 
 }
 
 func (f *resolutionRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&resolutionv1beta1.ResolutionRequest{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisresolutionv1beta1.ResolutionRequest{}, f.defaultInformer)
 }
 
-func (f *resolutionRequestInformer) Lister() v1beta1.ResolutionRequestLister {
-	return v1beta1.NewResolutionRequestLister(f.Informer().GetIndexer())
+func (f *resolutionRequestInformer) Lister() resolutionv1beta1.ResolutionRequestLister {
+	return resolutionv1beta1.NewResolutionRequestLister(f.Informer().GetIndexer())
 }

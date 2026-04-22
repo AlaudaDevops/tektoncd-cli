@@ -1,7 +1,6 @@
 apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
-  creationTimestamp: null
   name: tt1
   namespace: ns
 spec:
@@ -9,7 +8,7 @@ spec:
   - default: value
     description: test with one param
     name: key
-  resourceTemplates:
+  resourcetemplates:
   - apiVersion: tekton.dev/v1beta1
     kind: PipelineRun
     metadata:
