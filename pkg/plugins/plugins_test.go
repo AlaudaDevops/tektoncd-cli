@@ -33,6 +33,13 @@ func TestFindPluginInPath(t *testing.T) {
 	assert.Equal(t, path, nd.Join("tkn-testp"))
 }
 
+func TestFindPluginRejectsPathTraversalInput(t *testing.T) {
+	t.Setenv(pluginDirEnv, "/tmp/plugins")
+
+	_, err := FindPlugin("../evil")
+	assert.ErrorContains(t, err, "invalid plugin name")
+}
+
 func TestGetAllTknPluginFromPathPlugindir(t *testing.T) {
 	nd := fs.NewDir(t, "TestGetAllTknPluginFromPluginPath")
 	defer nd.Remove()
