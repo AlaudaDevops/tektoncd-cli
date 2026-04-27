@@ -17,7 +17,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"strings"
 
 	intoto "github.com/in-toto/attestation/go/v1"
 	"github.com/tektoncd/chains/pkg/chains/objects"
@@ -31,8 +30,6 @@ import (
 )
 
 const (
-	// ChainsAnnotationPrefix is the prefix for all Chains annotations
-	ChainsAnnotationPrefix    = "chains.tekton.dev/"
 	StorageBackendTekton      = "tekton"
 	PayloadAnnotationFormat   = "chains.tekton.dev/payload-%s"
 	SignatureAnnotationFormat = "chains.tekton.dev/signature-%s"
@@ -127,7 +124,7 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.TektonObje
 	return m, nil
 }
 
-// RetrievePayloads retrieve the payload stored in the taskrun.
+// RetrievePayload retrieve the payload stored in the taskrun.
 func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	logger := logging.FromContext(ctx)
 	logger.Infof("Retrieving payload on %s/%s/%s", obj.GetGVK(), obj.GetNamespace(), obj.GetName())
@@ -171,28 +168,13 @@ func (s *Storer) Store(ctx context.Context, req *api.StoreRequest[objects.Tekton
 	if key == "" {
 		key = string(obj.GetUID())
 	}
-
-	// Get current annotations from API server to ensure we have the latest state
-	currentAnnotations, err := obj.GetLatestAnnotations(ctx, s.client)
-	if err != nil {
-		return nil, err
-	}
-
-	// Merge existing annotations with new Chains annotations
-	mergedAnnotations := make(map[string]string)
-	for k, v := range currentAnnotations {
-		if strings.HasPrefix(k, ChainsAnnotationPrefix) {
-			mergedAnnotations[k] = v
-		}
-	}
-
-	// Add Chains-specific annotations
-	mergedAnnotations[fmt.Sprintf(PayloadAnnotationFormat, key)] = base64.StdEncoding.EncodeToString(req.Bundle.Content)
-	mergedAnnotations[fmt.Sprintf(SignatureAnnotationFormat, key)] = base64.StdEncoding.EncodeToString(req.Bundle.Signature)
-	mergedAnnotations[fmt.Sprintf(CertAnnotationsFormat, key)] = base64.StdEncoding.EncodeToString(req.Bundle.Cert)
-	mergedAnnotations[fmt.Sprintf(ChainAnnotationFormat, key)] = base64.StdEncoding.EncodeToString(req.Bundle.Chain)
-
-	patchBytes, err := patch.GetAnnotationsPatch(mergedAnnotations, obj)
+	patchBytes, err := patch.GetAnnotationsPatch(map[string]string{
+		// Base64 encode both the signature and the payload
+		fmt.Sprintf(PayloadAnnotationFormat, key):   base64.StdEncoding.EncodeToString(req.Bundle.Content),
+		fmt.Sprintf(SignatureAnnotationFormat, key): base64.StdEncoding.EncodeToString(req.Bundle.Signature),
+		fmt.Sprintf(CertAnnotationsFormat, key):     base64.StdEncoding.EncodeToString(req.Bundle.Cert),
+		fmt.Sprintf(ChainAnnotationFormat, key):     base64.StdEncoding.EncodeToString(req.Bundle.Chain),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -201,10 +183,5 @@ func (s *Storer) Store(ctx context.Context, req *api.StoreRequest[objects.Tekton
 	if patchErr != nil {
 		return nil, patchErr
 	}
-
-	// Note: Ideally here we'll update the in-memory object to keep it consistent through
-	// the reconciliation loop. It hasn't been done to preserve the existing controller behavior
-	// and maintain compatibility with existing tests. This could be revisited in the future.
-
 	return &api.StoreResponse{}, nil
 }

@@ -61,10 +61,7 @@ func (s *AttestationStorer) Store(ctx context.Context, req *api.StoreRequest[nam
 		repo = *s.repo
 	}
 	se, err := ociremote.SignedEntity(req.Artifact, ociremote.WithRemoteOptions(s.remoteOpts...))
-	var entityNotFoundError *ociremote.EntityNotFoundError
-	if errors.As(err, &entityNotFoundError) {
-		se = ociremote.SignedUnknown(req.Artifact)
-	} else if err != nil {
+	if err != nil {
 		return nil, errors.Wrap(err, "getting signed image")
 	}
 
