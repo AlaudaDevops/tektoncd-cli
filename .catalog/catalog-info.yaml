@@ -1,0 +1,46 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: tektoncd-cli
+  title: Tektoncd CLI
+  description: Tektoncd CLI（tkn）是 Tekton Pipelines 的官方命令行工具，提供对 PipelineRun、TaskRun、Pipeline、Task 等资源的完整操作能力，支持流水线触发、日志查看、资源管理等功能。
+  tags:
+    - tekton
+    - ci-cd
+    - cli
+    - tool
+  links:
+    - url: https://github.com/AlaudaDevops/tektoncd-cli
+      title: GitHub Repository
+      icon: github
+    - url: https://build-sonar.alauda.cn/dashboard?id=github.com-AlaudaDevops-tektoncd-cli
+      title: SonarQube
+      icon: dashboard
+    - url: https://github.com/tektoncd/cli
+      title: Upstream Repository
+      icon: github
+  annotations:
+    # github plugin
+    github.com/project-slug: AlaudaDevops/tektoncd-cli
+    # sonarqube plugin
+    sonarqube.org/project-key: github.com-AlaudaDevops-tektoncd-cli
+    # 开源组件代码仓库地址，格式：${url}/${project}/${repo}
+    acp.cpaas.io/open-source-component-repo: https://github.com/tektoncd/cli
+    # 开源组件的版本信息，只适用于开源组件，自研组件默认不收集版本信息,格式 ${version}
+    acp.cpaas.io/open-source-component-version: v0.41.2
+    # 开源组件的license信息,格式 ${license}
+    acp.cpaas.io/open-source-component-license: Apache
+    # 开源组件的license地址,格式 ${url}/${project}/${repo}/${license-path}
+    acp.cpaas.io/open-source-component-license_url: https://github.com/tektoncd/cli/blob/main/LICENSE
+    # backstage techdocs plugin
+    backstage.io/techdocs-ref: dir:../
+    acp.cpaas.io/owner: qingliu@alauda.io
+
+    # 组件属性，区别是否部署时必带的核心组件,可选值为 core 和 plugin。
+    acp.cpaas.io/functional-attributes: plugin
+
+spec:
+  type: service
+  system: system:alauda-devops-system
+  lifecycle: production
+  owner: devops
