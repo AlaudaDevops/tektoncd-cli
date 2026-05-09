@@ -1,6 +1,6 @@
 module github.com/tektoncd/cli
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -214,7 +214,7 @@ require (
 	github.com/hashicorp/vault/api v1.22.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/in-toto/attestation v1.1.2 // indirect
-	github.com/in-toto/in-toto-golang v0.9.0 // indirect
+	github.com/in-toto/in-toto-golang v0.11.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
